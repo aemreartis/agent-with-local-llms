@@ -1,0 +1,354 @@
+# 📊 AGENTIC RAG MONITORING CONFIGURATION
+# Real-time performance tracking and alerting for component comparison
+
+# === PROMETHEUS METRICS CONFIGURATION ===
+metrics:
+  # LLM Provider Metrics
+  llm_metrics:
+    - name: "llm_request_duration_seconds"
+      type: "histogram"
+      description: "Time spent processing LLM requests"
+      labels: ["provider", "model", "endpoint"]
+      buckets: [0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0]
+    
+    - name: "llm_requests_total"
+      type: "counter"
+      description: "Total number of LLM requests"
+      labels: ["provider", "model", "status"]
+    
+    - name: "llm_token_generation_rate"
+      type: "gauge"
+      description: "Tokens generated per second"
+      labels: ["provider", "model"]
+    
+    - name: "llm_queue_size"
+      type: "gauge"
+      description: "Number of requests in LLM queue"
+      labels: ["provider"]
+    
+    - name: "llm_memory_usage_bytes"
+      type: "gauge"
+      description: "Memory usage by LLM provider"
+      labels: ["provider", "gpu_id"]
+
+  # Vector Database Metrics
+  vector_metrics:
+    - name: "vector_search_duration_seconds"
+      type: "histogram"
+      description: "Time spent on vector searches"
+      labels: ["provider", "collection", "search_type"]
+      buckets: [0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0]
+    
+    - name: "vector_search_results_count"
+      type: "histogram"
+      description: "Number of results returned"
+      labels: ["provider", "collection"]
+      buckets: [1, 5, 10, 20, 50, 100]
+    
+    - name: "vector_index_size_bytes"
+      type: "gauge"
+      description: "Size of vector index"
+      labels: ["provider", "collection"]
+    
+    - name: "vector_search_accuracy"
+      type: "gauge"
+      description: "Search accuracy metrics"
+      labels: ["provider", "metric_type"]  # precision_at_k, recall_at_k, etc.
+
+  # Search Enhancement Metrics
+  search_metrics:
+    - name: "search_hybrid_duration_seconds"
+      type: "histogram"
+      description: "Time for hybrid search (vector + keyword)"
+      labels: ["vector_provider", "keyword_provider"]
+      buckets: [0.05, 0.1, 0.2, 0.5, 1.0, 2.0]
+    
+    - name: "search_rerank_duration_seconds"
+      type: "histogram"
+      description: "Time spent reranking results"
+      labels: ["reranker_provider", "result_count"]
+      buckets: [0.01, 0.05, 0.1, 0.2, 0.5]
+
+  # Agent Performance Metrics
+  agent_metrics:
+    - name: "agent_workflow_duration_seconds"
+      type: "histogram"
+      description: "Complete agent workflow execution time"
+      labels: ["workflow_type", "complexity"]
+      buckets: [1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0]
+    
+    - name: "agent_tool_calls_total"
+      type: "counter"
+      description: "Number of tool calls made by agent"
+      labels: ["tool_name", "success"]
+    
+    - name: "agent_memory_operations"
+      type: "counter"
+      description: "Memory read/write operations"
+      labels: ["operation_type", "memory_provider"]
+
+  # Quality Metrics (Updated in real-time)
+  quality_metrics:
+    - name: "response_quality_score"
+      type: "gauge"
+      description: "Real-time quality assessment"
+      labels: ["metric_type", "provider_combination"]  # accuracy, relevance, etc.
+    
+    - name: "user_satisfaction_score"
+      type: "gauge"
+      description: "User feedback scores"
+      labels: ["rating_type", "time_period"]
+
+# === GRAFANA DASHBOARD CONFIGURATION ===
+dashboards:
+  # Component Comparison Dashboard
+  component_comparison:
+    title: "Component Performance Comparison"
+    panels:
+      - title: "LLM Provider Latency Comparison"
+        type: "stat"
+        targets:
+          - expr: "rate(llm_request_duration_seconds_sum[5m]) / rate(llm_request_duration_seconds_count[5m])"
+            legend: "{{provider}} - {{model}}"
+        thresholds:
+          - color: "green"
+            value: 0
+          - color: "yellow" 
+            value: 2
+          - color: "red"
+            value: 5
+
+      - title: "Vector Search Performance"
+        type: "timeseries"
+        targets:
+          - expr: "histogram_quantile(0.95, rate(vector_search_duration_seconds_bucket[5m]))"
+            legend: "{{provider}} P95"
+          - expr: "histogram_quantile(0.50, rate(vector_search_duration_seconds_bucket[5m]))"
+            legend: "{{provider}} P50"
+
+      - title: "Provider Throughput Comparison"
+        type: "bargauge"
+        targets:
+          - expr: "rate(llm_requests_total[5m])"
+            legend: "{{provider}}"
+
+      - title: "Quality Metrics by Provider"
+        type: "heatmap"
+        targets:
+          - expr: "response_quality_score"
+            legend: "{{metric_type}} - {{provider_combination}}"
+
+  # Real-time A/B Testing Dashboard  
+  ab_testing:
+    title: "Live A/B Testing Results"
+    panels:
+      - title: "Experiment Traffic Distribution"
+        type: "piechart"
+        targets:
+          - expr: "sum by (variant) (rate(agent_workflow_duration_seconds_count[5m]))"
+
+      - title: "Variant Performance Comparison"
+        type: "table"
+        targets:
+          - expr: "avg by (variant) (rate(agent_workflow_duration_seconds_sum[5m]) / rate(agent_workflow_duration_seconds_count[5m]))"
+            alias: "Avg Latency"
+          - expr: "histogram_quantile(0.95, rate(agent_workflow_duration_seconds_bucket[5m]))"
+            alias: "P95 Latency"
+          - expr: "avg by (variant) (response_quality_score)"
+            alias: "Quality Score"
+
+      - title: "Statistical Significance"
+        type: "stat"
+        targets:
+          - expr: "ab_test_confidence_level"
+            legend: "Confidence Level"
+
+# === ALERTING RULES ===
+alerts:
+  # Performance Degradation Alerts
+  performance_alerts:
+    - alert: "HighLLMLatency"
+      expr: "histogram_quantile(0.95, rate(llm_request_duration_seconds_bucket[5m])) > 10"
+      for: "2m"
+      labels:
+        severity: "warning"
+        component: "llm"
+      annotations:
+        summary: "LLM latency is high for provider {{ $labels.provider }}"
+        description: "P95 latency is {{ $value }}s for provider {{ $labels.provider }}"
+
+    - alert: "VectorSearchSlow"
+      expr: "histogram_quantile(0.95, rate(vector_search_duration_seconds_bucket[5m])) > 2"
+      for: "1m"
+      labels:
+        severity: "warning"
+        component: "vector_db"
+      annotations:
+        summary: "Vector search is slow for {{ $labels.provider }}"
+
+    - alert: "LowThroughput"
+      expr: "rate(llm_requests_total[5m]) < 1"
+      for: "3m"
+      labels:
+        severity: "critical"
+        component: "system"
+      annotations:
+        summary: "System throughput is critically low"
+
+  # Quality Degradation Alerts
+  quality_alerts:
+    - alert: "QualityDropped"
+      expr: "avg_over_time(response_quality_score[10m]) < 0.7"
+      for: "5m"
+      labels:
+        severity: "warning"
+        component: "quality"
+      annotations:
+        summary: "Response quality has dropped below threshold"
+
+    - alert: "HighHallucination"
+      expr: "rate(hallucination_detected_total[10m]) > 0.1"
+      for: "2m"
+      labels:
+        severity: "critical"
+        component: "quality"
+      annotations:
+        summary: "High hallucination rate detected"
+
+  # Component Failure Alerts
+  failure_alerts:
+    - alert: "ProviderDown"
+      expr: "up{job=~'.*provider.*'} == 0"
+      for: "30s"
+      labels:
+        severity: "critical"
+        component: "infrastructure"
+      annotations:
+        summary: "Provider {{ $labels.instance }} is down"
+
+    - alert: "HighErrorRate"
+      expr: "rate(llm_requests_total{status='error'}[5m]) / rate(llm_requests_total[5m]) > 0.05"
+      for: "2m"
+      labels:
+        severity: "warning"
+        component: "llm"
+      annotations:
+        summary: "High error rate for {{ $labels.provider }}"
+
+# === AUTOMATED EXPERIMENT TRIGGERS ===
+automation:
+  # Trigger A/B tests when performance degrades
+  auto_experiments:
+    - name: "performance_degradation_test"
+      trigger:
+        condition: "histogram_quantile(0.95, rate(llm_request_duration_seconds_bucket[10m])) > 5"
+        duration: "5m"
+      action:
+        type: "start_ab_test"
+        config:
+          variants:
+            control: "current_providers"
+            treatment: "fallback_providers"
+          traffic_split: [90, 10]  # 90% control, 10% treatment
+          duration: "1h"
+          success_criteria:
+            latency_improvement: ">20%"
+            quality_maintained: ">0.95"
+
+    - name: "quality_degradation_test"
+      trigger:
+        condition: "avg_over_time(response_quality_score[15m]) < 0.8"
+        duration: "10m"
+      action:
+        type: "start_ab_test"
+        config:
+          variants:
+            control: "current_config"
+            treatment: "enhanced_config"
+          traffic_split: [80, 20]
+
+# === COST TRACKING ===
+cost_tracking:
+  providers:
+    llm:
+      - provider: "vllm"
+        cost_per_1k_tokens: 0.0  # Local inference
+        resource_cost_per_hour: 2.5  # GPU cost
+      - provider: "openai"
+        cost_per_1k_tokens: 0.002
+        resource_cost_per_hour: 0.0
+
+    vector_db:
+      - provider: "qdrant"
+        storage_cost_per_gb: 0.1
+        query_cost_per_1k: 0.0001
+      - provider: "pinecone"
+        storage_cost_per_gb: 0.7
+        query_cost_per_1k: 0.0004
+
+  metrics:
+    - name: "cost_per_query"
+      calculation: "sum(token_usage * cost_per_token + query_count * cost_per_query + resource_time * cost_per_hour)"
+      labels: ["provider_combination", "time_period"]
+
+    - name: "cost_efficiency_ratio"
+      calculation: "quality_score / cost_per_query"
+      labels: ["provider_combination"]
+
+# === BENCHMARKING SCHEDULES ===
+scheduled_benchmarks:
+  # Daily performance benchmarks
+  daily_benchmark:
+    schedule: "0 2 * * *"  # 2 AM daily
+    datasets: ["benchmark_v1", "production_sample"]
+    providers_to_test: "all_configured"
+    metrics_to_collect: "all"
+    
+  # Weekly comprehensive evaluation
+  weekly_evaluation:
+    schedule: "0 3 * * 0"  # 3 AM Sunday
+    datasets: ["comprehensive_benchmark", "domain_specific_tests"]
+    providers_to_test: "all_available"
+    include_experimental: true
+    
+  # Monthly provider comparison
+  monthly_comparison:
+    schedule: "0 4 1 * *"  # 4 AM first day of month
+    action: "full_provider_comparison"
+    generate_report: true
+    update_recommendations: true
+
+# === NOTIFICATION CHANNELS ===
+notifications:
+  channels:
+    - name: "slack"
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      events: ["alerts", "benchmark_results", "ab_test_results"]
+      
+    - name: "email"
+      smtp_config:
+        server: "${SMTP_SERVER}"
+        username: "${SMTP_USERNAME}"
+        password: "${SMTP_PASSWORD}"
+      events: ["critical_alerts", "weekly_reports"]
+      
+    - name: "pagerduty"
+      integration_key: "${PAGERDUTY_KEY}"
+      events: ["critical_alerts", "provider_down"]
+
+# === EXPERIMENT CONFIGURATION ===
+experiment_defaults:
+  statistical_significance:
+    min_sample_size: 1000
+    confidence_level: 0.95
+    minimum_effect_size: 0.05
+    
+  safety_limits:
+    max_traffic_to_experimental: 0.2  # Never route more than 20% to experimental
+    auto_stop_if_error_rate_exceeds: 0.1
+    auto_stop_if_latency_exceeds: "10s"
+    
+  evaluation_frequency:
+    metrics_collection: "1m"
+    significance_check: "10m"
+    report_generation: "1h" 
