@@ -21,6 +21,7 @@ class AgentExecutionState(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     PAUSED = "paused"
+    TERMINATED = "terminated"
 
 
 class ToolType(Enum):
@@ -210,6 +211,50 @@ class AgentWorkflowInterface(ABC):
     @abstractmethod
     def get_available_steps(self) -> List[str]:
         """Get list of available steps in the workflow."""
+        pass
+
+
+class AgentWorkflowOrchestratorInterface(ABC):
+    """Abstract interface for agent workflow orchestrator."""
+    
+    @abstractmethod
+    async def initialize(self, config: Dict[str, Any]) -> None:
+        """Initialize the workflow orchestrator with configuration."""
+        pass
+    
+    @abstractmethod
+    async def register_workflow(self, workflow: WorkflowDefinition) -> bool:
+        """Register a workflow definition."""
+        pass
+    
+    @abstractmethod
+    async def get_workflow(self, workflow_name: str) -> Optional[WorkflowDefinition]:
+        """Get a workflow definition by name."""
+        pass
+    
+    @abstractmethod
+    async def list_workflows(self) -> List[str]:
+        """List all registered workflow names."""
+        pass
+    
+    @abstractmethod
+    async def execute_workflow(self, workflow_name: str, initial_state: AgentState) -> AgentState:
+        """Execute a workflow with the given initial state."""
+        pass
+    
+    @abstractmethod
+    async def health_check(self) -> bool:
+        """Check if the orchestrator is healthy."""
+        pass
+    
+    @abstractmethod
+    async def get_orchestrator_info(self) -> Dict[str, Any]:
+        """Get orchestrator information."""
+        pass
+    
+    @abstractmethod
+    async def get_workflow_info(self, workflow_name: str) -> Optional[Dict[str, Any]]:
+        """Get detailed information about a workflow."""
         pass
 
 
