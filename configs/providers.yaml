@@ -25,4 +25,56 @@ memory:
         username: "postgres"
         password: "password"
         table_name: "conversation_memory"
-        max_connections: 10 
+        max_connections: 10
+
+# Document Processing Providers
+document_loader:
+  default: "text"
+  providers:
+    text:
+      class: "src.providers.document.text_loader.TextDocumentLoader"
+      config:
+        max_file_size: 10485760  # 10MB
+        supported_extensions: [".txt", ".md", ".csv", ".html", ".json"]
+
+document_chunker:
+  default: "text"
+  providers:
+    text:
+      class: "src.providers.document.text_chunker.TextChunker"
+      config:
+        chunk_size: 1000
+        chunk_overlap: 200
+        min_chunk_size: 100
+
+document_processor:
+  default: "text"
+  providers:
+    text:
+      class: "src.providers.document.text_processor.TextProcessor"
+      config:
+        normalize_whitespace: true
+        normalize_unicode: true
+        remove_html_tags: true
+        extract_metadata: true
+        language_detection: true
+
+document_pipeline:
+  default: "text"
+  providers:
+    text:
+      class: "src.providers.document.document_pipeline.DocumentPipeline"
+      config:
+        loader:
+          max_file_size: 10485760
+          supported_extensions: [".txt", ".md", ".csv", ".html", ".json"]
+        processor:
+          normalize_whitespace: true
+          normalize_unicode: true
+          remove_html_tags: true
+          extract_metadata: true
+          language_detection: true
+        chunker:
+          chunk_size: 1000
+          chunk_overlap: 200
+          min_chunk_size: 100 

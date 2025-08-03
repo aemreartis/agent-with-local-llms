@@ -1,2 +1,9 @@
 memory:
-  provider: ${MEMORY_PROVIDER:-inmemory} 
+  provider: ${MEMORY_PROVIDER:-inmemory}
+
+# Document Processing Components
+document_processing:
+  loader: ${DOCUMENT_LOADER:-text}
+  processor: ${DOCUMENT_PROCESSOR:-text}
+  chunker: ${DOCUMENT_CHUNKER:-text}
+  pipeline: ${DOCUMENT_PIPELINE:-text} 
