@@ -5,6 +5,12 @@ __pycache__/
 *.so
 .Python
 build/
+.venv/
+*.cache
+*.cursor/
+*.anaconda/
+*__init__.py
+.pytest_cache
 develop-eggs/
 dist/
 downloads/
@@ -89,4 +95,4 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
-*.tmp 
+*.tmp
