@@ -11,7 +11,8 @@ from src.interfaces.agent_interface import (
     AgentExecutionState, ToolType, AgentContext, AgentState, ToolResult,
     AgentNode, WorkflowStep, WorkflowDefinition,
     ToolInterface, AgentNodeInterface, AgentWorkflowInterface,
-    AgentMemoryInterface, ToolRegistryInterface, AgentOrchestratorInterface
+    AgentMemoryInterface, ToolRegistryInterface, AgentOrchestratorInterface,
+    AgentStateManagerInterface
 )
 
 
@@ -539,4 +540,71 @@ class TestAgentOrchestratorInterface:
         assert hasattr(orchestrator, "resume_session")
         assert hasattr(orchestrator, "terminate_session")
         assert hasattr(orchestrator, "health_check")
-        assert hasattr(orchestrator, "get_orchestrator_info") 
+        assert hasattr(orchestrator, "get_orchestrator_info")
+
+
+class TestAgentStateManagerInterface:
+    """Test agent state manager interface contract."""
+    
+    def test_agent_state_manager_interface_methods_exist(self):
+        """Test that agent state manager interface has required methods."""
+        class MockAgentStateManager(AgentStateManagerInterface):
+            async def initialize(self, config: Dict[str, Any]) -> None:
+                pass
+            
+            async def create_state(self, session_id: str, context) -> AgentState:
+                return AgentState()
+            
+            async def get_state(self, session_id: str):
+                return AgentState()
+            
+            async def update_state(self, session_id: str, state) -> bool:
+                return True
+            
+            async def transition_state(self, session_id: str, new_state, data=None) -> bool:
+                return True
+            
+            async def add_to_history(self, session_id: str, entry: Dict[str, Any]) -> bool:
+                return True
+            
+            async def get_history(self, session_id: str) -> list:
+                return []
+            
+            async def clear_history(self, session_id: str) -> bool:
+                return True
+            
+            async def set_error(self, session_id: str, error: str) -> bool:
+                return True
+            
+            async def clear_error(self, session_id: str) -> bool:
+                return True
+            
+            async def delete_state(self, session_id: str) -> bool:
+                return True
+            
+            async def list_sessions(self) -> list:
+                return []
+            
+            async def health_check(self) -> bool:
+                return True
+            
+            def get_state_manager_info(self) -> Dict[str, Any]:
+                return {}
+        
+        state_manager = MockAgentStateManager()
+        
+        # Verify all required methods exist
+        assert hasattr(state_manager, "initialize")
+        assert hasattr(state_manager, "create_state")
+        assert hasattr(state_manager, "get_state")
+        assert hasattr(state_manager, "update_state")
+        assert hasattr(state_manager, "transition_state")
+        assert hasattr(state_manager, "add_to_history")
+        assert hasattr(state_manager, "get_history")
+        assert hasattr(state_manager, "clear_history")
+        assert hasattr(state_manager, "set_error")
+        assert hasattr(state_manager, "clear_error")
+        assert hasattr(state_manager, "delete_state")
+        assert hasattr(state_manager, "list_sessions")
+        assert hasattr(state_manager, "health_check")
+        assert hasattr(state_manager, "get_state_manager_info") 

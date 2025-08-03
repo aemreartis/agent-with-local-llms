@@ -301,6 +301,80 @@ class ToolRegistryInterface(ABC):
         pass
 
 
+class AgentStateManagerInterface(ABC):
+    """Abstract interface for agent state management."""
+    
+    @abstractmethod
+    async def initialize(self, config: Dict[str, Any]) -> None:
+        """Initialize the agent state manager with configuration."""
+        pass
+    
+    @abstractmethod
+    async def create_state(self, session_id: str, context: AgentContext) -> AgentState:
+        """Create a new agent state for a session."""
+        pass
+    
+    @abstractmethod
+    async def get_state(self, session_id: str) -> Optional[AgentState]:
+        """Get the current state for a session."""
+        pass
+    
+    @abstractmethod
+    async def update_state(self, session_id: str, state: AgentState) -> bool:
+        """Update the state for a session."""
+        pass
+    
+    @abstractmethod
+    async def transition_state(self, session_id: str, new_state: AgentExecutionState, data: Optional[Dict[str, Any]] = None) -> bool:
+        """Transition the agent state to a new execution state."""
+        pass
+    
+    @abstractmethod
+    async def add_to_history(self, session_id: str, entry: Dict[str, Any]) -> bool:
+        """Add an entry to the agent's execution history."""
+        pass
+    
+    @abstractmethod
+    async def get_history(self, session_id: str) -> List[Dict[str, Any]]:
+        """Get the execution history for a session."""
+        pass
+    
+    @abstractmethod
+    async def clear_history(self, session_id: str) -> bool:
+        """Clear the execution history for a session."""
+        pass
+    
+    @abstractmethod
+    async def set_error(self, session_id: str, error: str) -> bool:
+        """Set an error state for a session."""
+        pass
+    
+    @abstractmethod
+    async def clear_error(self, session_id: str) -> bool:
+        """Clear the error state for a session."""
+        pass
+    
+    @abstractmethod
+    async def delete_state(self, session_id: str) -> bool:
+        """Delete the state for a session."""
+        pass
+    
+    @abstractmethod
+    async def list_sessions(self) -> List[str]:
+        """List all active session IDs."""
+        pass
+    
+    @abstractmethod
+    async def health_check(self) -> bool:
+        """Check if the agent state manager is healthy."""
+        pass
+    
+    @abstractmethod
+    def get_state_manager_info(self) -> Dict[str, Any]:
+        """Get information about the agent state manager."""
+        pass
+
+
 class AgentOrchestratorInterface(ABC):
     """Abstract interface for agent orchestration."""
     
