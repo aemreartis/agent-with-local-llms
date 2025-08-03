@@ -723,14 +723,15 @@ volumes:
 - ✅ **Total: 91/91 document processing tests passing** with complete Red-Green-Refactor cycles
 
 **🔄 STAGE 6: AGENT CORE** - **IN PROGRESS** *(100% TDD)*
-- ✅ Agent Interfaces (25 tests) - Data models and abstract interfaces for agent system
+- ✅ Agent Interfaces (26 tests) - Data models and abstract interfaces for agent system
 - ✅ Tool Registry (24 tests) - Centralized tool registration, discovery, and execution
 - ✅ Agent Memory (28 tests) - State and context storage with session management
+- ✅ Agent State Manager (28 tests) - State transitions and history management
 - ⏳ Agent Node Implementations - Individual reasoning nodes (pending)
 - ⏳ Agent Workflow Orchestrator - LangGraph-based workflow management (pending)
 - ⏳ Agent Orchestrator - High-level agent coordination (pending)
 - ⏳ Agent Integration Tests - End-to-end agent workflows (pending)
-- ✅ **Current: 77/77 agent core tests passing** with complete Red-Green-Refactor cycles
+- ✅ **Current: 106/106 agent core tests passing** with complete Red-Green-Refactor cycles
 
 ### **📋 Stage 6: Agent Core - Detailed Checklist**
 
@@ -745,7 +746,7 @@ volumes:
 #### **Phase 2: Core Agent Components** 🔄 **IN PROGRESS**
 - [x] **Tool Registry** - Dynamic tool registration and discovery (24 tests)
 - [x] **Agent Memory** - Agent-specific memory handling (28 tests)
-- [ ] **Agent State Manager** - Manage agent state transitions
+- [x] **Agent State Manager** - Manage agent state transitions (28 tests)
 - [ ] **Agent Node Implementations** - Individual reasoning nodes
 - [ ] **Workflow Orchestrator** - LangGraph workflow management
 
@@ -762,9 +763,9 @@ volumes:
 - [ ] **Error Handling Tests** - Agent failure scenarios
 
 #### **📊 Stage 6 Progress Summary**
-- **Completed Components**: 3/8 (37.5%)
-- **Tests Passing**: 77/77 (100% of implemented components)
-- **Expected Total Tests**: ~100 tests
+- **Completed Components**: 4/8 (50%)
+- **Tests Passing**: 106/106 (100% of implemented components)
+- **Expected Total Tests**: ~120 tests
 - **TDD Approach**: Strictly followed (Red-Green-Refactor)
 
 ### **📅 Revised Stage Timeline (TDD-Driven)**
@@ -1344,4 +1345,4 @@ decision_criteria = {
 - ✅ **Orchestration Layer**: Complete service integration with Search, Query, and Chat orchestrators
 - ✅ **Memory System**: Complete memory provider implementation with Redis/PostgreSQL support
 - ✅ **Document Processing System**: Complete document ingestion, processing, and chunking pipeline
-- 🔄 **Agent System**: Tool registry, agent memory, and interface contracts implemented 
+- 🔄 **Agent System**: Tool registry, agent memory, state manager, and interface contracts implemented 
