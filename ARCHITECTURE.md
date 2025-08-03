@@ -195,6 +195,39 @@ mypy==1.14.*                   # MIT - Type checking
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### **🤖 Agent System Architecture** (Stage 6 Implementation)
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    AGENT ORCHESTRATOR                              │
+│              (High-level agent coordination)                       │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────────┐
+│                  WORKFLOW ORCHESTRATOR                             │
+│              (LangGraph workflow management)                       │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────────┐
+│                    AGENT COMPONENTS                                │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐   │
+│  │Tool Registry│ │Agent Memory │ │Agent Nodes  │ │State Manager│   │
+│  │             │ │             │ │             │ │             │   │
+│  │register()   │ │store()      │ │execute()    │ │transition() │   │
+│  │execute()    │ │retrieve()   │ │reason()     │ │manage()     │   │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────────┐
+│                    AGENT INTERFACES                                │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐   │
+│  │ToolInterface│ │AgentMemory  │ │AgentNode    │ │AgentWorkflow│   │
+│  │             │ │Interface    │ │Interface    │ │Interface    │   │
+│  │execute()    │ │store()      │ │execute()    │ │execute()    │   │
+│  │health_check()│ │retrieve()   │ │health_check()│ │health_check()│   │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
 ### **🧩 Modular Design Principles**
 
 #### **1. Interface-First Architecture**
@@ -271,6 +304,15 @@ Cache Management     Conversation History  Testing/Dev Mode
 Service Request → Component Registry → Interface Resolution → Provider Factory
    ↓
 Configuration Lookup → Provider Instantiation → Interface Implementation → Response
+```
+
+#### **Agent System Flow** (Stage 6 Implementation)
+```
+User Query → Agent Orchestrator → Workflow Selection → Agent Memory
+   ↓
+Tool Registry → Tool Execution → State Management → Response Generation
+   ↓
+Agent Memory → Context Storage → Session Management → Response Delivery
 ```
 
 ---
@@ -680,6 +722,51 @@ volumes:
 - ✅ Document Orchestration Integration (5 tests) - Orchestration system integration
 - ✅ **Total: 91/91 document processing tests passing** with complete Red-Green-Refactor cycles
 
+**🔄 STAGE 6: AGENT CORE** - **IN PROGRESS** *(100% TDD)*
+- ✅ Agent Interfaces (25 tests) - Data models and abstract interfaces for agent system
+- ✅ Tool Registry (24 tests) - Centralized tool registration, discovery, and execution
+- ✅ Agent Memory (28 tests) - State and context storage with session management
+- ⏳ Agent Node Implementations - Individual reasoning nodes (pending)
+- ⏳ Agent Workflow Orchestrator - LangGraph-based workflow management (pending)
+- ⏳ Agent Orchestrator - High-level agent coordination (pending)
+- ⏳ Agent Integration Tests - End-to-end agent workflows (pending)
+- ✅ **Current: 77/77 agent core tests passing** with complete Red-Green-Refactor cycles
+
+### **📋 Stage 6: Agent Core - Detailed Checklist**
+
+#### **Phase 1: Agent Interfaces & Data Models** ✅ **COMPLETE**
+- [x] **Agent State Interface** - Define agent state data structures (25 tests)
+- [x] **Agent Workflow Interface** - Define workflow orchestration contracts
+- [x] **Tool Interface** - Define tool integration contracts
+- [x] **Agent Node Interface** - Define individual agent node contracts
+- [x] **Agent Graph Interface** - Define graph-based workflow contracts
+- [x] **Agent Memory Interface** - Define agent-specific memory contracts
+
+#### **Phase 2: Core Agent Components** 🔄 **IN PROGRESS**
+- [x] **Tool Registry** - Dynamic tool registration and discovery (24 tests)
+- [x] **Agent Memory** - Agent-specific memory handling (28 tests)
+- [ ] **Agent State Manager** - Manage agent state transitions
+- [ ] **Agent Node Implementations** - Individual reasoning nodes
+- [ ] **Workflow Orchestrator** - LangGraph workflow management
+
+#### **Phase 3: Agent Workflows** ⏳ **PENDING**
+- [ ] **RAG Agent Workflow** - Document-based reasoning
+- [ ] **Multi-Step Reasoning Workflow** - Complex problem solving
+- [ ] **Tool Usage Workflow** - External tool integration
+- [ ] **Conversation Agent Workflow** - Interactive reasoning
+
+#### **Phase 4: Integration & Testing** ⏳ **PENDING**
+- [ ] **Agent Integration Tests** - End-to-end agent workflows
+- [ ] **Tool Integration Tests** - External tool connectivity
+- [ ] **Performance Tests** - Agent workflow performance
+- [ ] **Error Handling Tests** - Agent failure scenarios
+
+#### **📊 Stage 6 Progress Summary**
+- **Completed Components**: 3/8 (37.5%)
+- **Tests Passing**: 77/77 (100% of implemented components)
+- **Expected Total Tests**: ~100 tests
+- **TDD Approach**: Strictly followed (Red-Green-Refactor)
+
 ### **📅 Revised Stage Timeline (TDD-Driven)**
 
 | Stage | Status | Focus Area | Key Deliverables | TDD Approach |
@@ -689,7 +776,7 @@ volumes:
 | **3** | ✅ **COMPLETE** | Orchestration Layer | Service integration, configuration loading | **Interface Tests First** |
 | **4** | ✅ **COMPLETE** | Memory System | Redis/PostgreSQL providers | **TDD Contracts** |
 | **5** | ✅ **COMPLETE** | Document Processing | File ingestion, chunking, metadata | **Test-Driven** |
-| **6** | ⏳ **PENDING** | Agent Core | LangGraph workflows, reasoning | **TDD Workflows** |
+| **6** | 🔄 **IN PROGRESS** | Agent Core | LangGraph workflows, reasoning | **TDD Workflows** |
 | **7** | ⏳ **PENDING** | API Layer | FastAPI endpoints, authentication | **API Test First** |
 | **8** | ⏳ **PENDING** | Integration Testing | End-to-end provider combinations | **E2E TDD** |
 | **9** | ⏳ **PENDING** | Monitoring | Prometheus, Grafana, quality metrics | **Metrics TDD** |
@@ -714,7 +801,7 @@ volumes:
 - **TDD Excellence**: Started with interface tests, implemented to pass
 - **Simplified Mocking**: `patch.dict('sys.modules')` approach for external libs
 - **Parallel Provider Development**: Interface-first enables independent work
-- **Continuous Testing**: 232 tests provide confidence for changes
+- **Continuous Testing**: 400+ tests provide confidence for changes
 
 ---
 
@@ -1165,7 +1252,7 @@ async def run_comprehensive_evaluation():
 **✅ Memory Validation**: Each of our 3 memory providers has evaluation contracts  
 **✅ Regression Prevention**: Continuous testing prevents performance degradation  
 **✅ Modular Comparison**: Easy A/B testing thanks to plugin architecture  
-**✅ Quality Assurance**: 232 tests ensure reliable evaluation foundation
+**✅ Quality Assurance**: 400+ tests ensure reliable evaluation foundation
 
 #### **Continuous Evaluation Schedule**
 - **Daily Benchmarks**: Performance regression detection (2 AM)
@@ -1245,14 +1332,16 @@ decision_criteria = {
 ---
 
 **📅 Last Updated**: January 2025  
-**🔄 Version**: 1.5 (Stage 3 & 4 Complete - Orchestration & Memory System TDD Implementation)  
+**🔄 Version**: 1.6 (Stage 6 In Progress - Agent Core TDD Implementation)  
 **👥 Maintainers**: Development Team
 
 ### **🚀 CURRENT PROJECT STATUS**
 
 - ✅ **Stage 1, 2, 3, 4 & 5 Complete**: Interface-first architecture with 4 core providers + 3 memory providers + complete orchestration layer + document processing system
-- ✅ **323 Tests Passing**: Full TDD coverage with Red-Green-Refactor methodology  
+- 🔄 **Stage 6 In Progress**: Agent Core implementation with 77 tests passing
+- ✅ **400+ Tests Passing**: Full TDD coverage with Red-Green-Refactor methodology  
 - ✅ **Plugin Architecture**: Modular, swappable providers with registry system
 - ✅ **Orchestration Layer**: Complete service integration with Search, Query, and Chat orchestrators
 - ✅ **Memory System**: Complete memory provider implementation with Redis/PostgreSQL support
-- ✅ **Document Processing System**: Complete document ingestion, processing, and chunking pipeline 
+- ✅ **Document Processing System**: Complete document ingestion, processing, and chunking pipeline
+- 🔄 **Agent System**: Tool registry, agent memory, and interface contracts implemented 
