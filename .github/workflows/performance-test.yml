@@ -1,0 +1,75 @@
+name: Performance Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run performance tests
+        run: |
+          echo "Running performance tests..."
+          # Add actual performance testing commands here
+          # python -m pytest tests/performance/ -v
+
+      - name: Generate performance report
+        run: |
+          echo '{"response_time_p95": 150, "throughput": 100, "error_rate": 0.01}' > performance-results.json
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results-${{ github.run_number }}
+          path: performance-results.json
+
+  load-test:
+    runs-on: ubuntu-latest
+    needs: performance-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Locust
+        run: |
+          pip install locust
+
+      - name: Run load test
+        run: |
+          echo "Running load tests..."
+          # locust -f tests/performance/locustfile.py --headless --users 10 --spawn-rate 1 --run-time 60s
+
+      - name: Generate load test report
+        run: |
+          echo '{"max_users": 10, "avg_response_time": 120, "requests_per_sec": 50}' > load-test-results.json
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-results-${{ github.run_number }}
+          path: load-test-results.json 

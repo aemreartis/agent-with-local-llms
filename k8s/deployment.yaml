@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-app
+  namespace: agentic-rag
+  labels:
+    app: fastapi-app
+    version: v1.0.0
+    environment: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fastapi-app
+  template:
+    metadata:
+      labels:
+        app: fastapi-app
+        version: v1.0.0
+    spec:
+      containers:
+      - name: fastapi-app
+        image: agentic-rag:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        env:
+        - name: APP_ENV
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: VLLM_BASE_URL
+          value: "http://vllm-service:8001"
+        - name: QDRANT_URL
+          value: "http://qdrant-service:6333"
+        - name: REDIS_HOST
+          value: "redis-service"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: POSTGRES_HOST
+          value: "postgresql-service"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "agentic_rag"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: agentic-rag-secrets
+              key: postgres_user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: agentic-rag-secrets
+              key: postgres_password
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: app-config
+          mountPath: /app/configs
+          readOnly: true
+        - name: app-data
+          mountPath: /app/data
+        - name: app-logs
+          mountPath: /app/logs
+      volumes:
+      - name: app-config
+        configMap:
+          name: agentic-rag-config
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: app-data-pvc
+      - name: app-logs
+        persistentVolumeClaim:
+          claimName: app-logs-pvc
+      restartPolicy: Always 

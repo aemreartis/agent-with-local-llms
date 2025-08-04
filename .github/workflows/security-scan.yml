@@ -1,0 +1,159 @@
+name: Security Scan
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run Bandit security scan
+        run: |
+          pip install bandit
+          bandit -r src/ -f json -o bandit-report.json || true
+          bandit -r src/ -f txt -o bandit-report.txt || true
+
+      - name: Run Safety check
+        run: |
+          pip install safety
+          safety check --json --output safety-report.json || true
+          safety check --full-report --output safety-report.txt || true
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: 'trivy-report.json'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/${{ github.repository }}:latest'
+          format: 'json'
+          output: 'trivy-container-report.json'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Check for secrets
+        run: |
+          pip install detect-secrets
+          detect-secrets scan --baseline .secrets.baseline || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports-${{ github.run_number }}
+          path: |
+            bandit-report.json
+            bandit-report.txt
+            safety-report.json
+            safety-report.txt
+            trivy-report.json
+            trivy-container-report.json
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let comment = '## Security Scan Results\n\n';
+            
+            // Read Bandit report
+            if (fs.existsSync('bandit-report.json')) {
+              const banditReport = JSON.parse(fs.readFileSync('bandit-report.json', 'utf8'));
+              const issues = banditReport.results || [];
+              comment += `### Bandit Security Scan\n`;
+              comment += `- **Issues Found**: ${issues.length}\n`;
+              if (issues.length > 0) {
+                comment += `- **Severity**: ${issues.map(i => i.issue_severity).join(', ')}\n`;
+              }
+              comment += '\n';
+            }
+            
+            // Read Safety report
+            if (fs.existsSync('safety-report.json')) {
+              const safetyReport = JSON.parse(fs.readFileSync('safety-report.json', 'utf8'));
+              const vulnerabilities = safetyReport.vulnerabilities || [];
+              comment += `### Safety Dependency Check\n`;
+              comment += `- **Vulnerabilities Found**: ${vulnerabilities.length}\n`;
+              if (vulnerabilities.length > 0) {
+                comment += `- **Severity**: ${vulnerabilities.map(v => v.severity).join(', ')}\n`;
+              }
+              comment += '\n';
+            }
+            
+            // Read Trivy report
+            if (fs.existsSync('trivy-report.json')) {
+              const trivyReport = JSON.parse(fs.readFileSync('trivy-report.json', 'utf8'));
+              const vulnerabilities = trivyReport.Results?.[0]?.Vulnerabilities || [];
+              comment += `### Trivy Vulnerability Scan\n`;
+              comment += `- **Vulnerabilities Found**: ${vulnerabilities.length}\n`;
+              if (vulnerabilities.length > 0) {
+                const severities = [...new Set(vulnerabilities.map(v => v.Severity))];
+                comment += `- **Severity**: ${severities.join(', ')}\n`;
+              }
+              comment += '\n';
+            }
+            
+            comment += '---\n*Security scan completed automatically*';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  notify-security-issues:
+    runs-on: ubuntu-latest
+    needs: security-scan
+    if: always() && needs.security-scan.result == 'success'
+    steps:
+      - name: Download security reports
+        uses: actions/download-artifact@v3
+        with:
+          name: security-reports-${{ github.run_number }}
+
+      - name: Check for critical issues
+        run: |
+          # Check if there are any critical security issues
+          if [ -f "bandit-report.json" ]; then
+            CRITICAL_ISSUES=$(jq '.results[] | select(.issue_severity == "HIGH") | .issue_text' bandit-report.json | wc -l)
+            if [ "$CRITICAL_ISSUES" -gt 0 ]; then
+              echo "CRITICAL_ISSUES_FOUND=true" >> $GITHUB_ENV
+              echo "Found $CRITICAL_ISSUES critical security issues"
+            fi
+          fi
+
+      - name: Notify on critical issues
+        if: env.CRITICAL_ISSUES_FOUND == 'true'
+        run: |
+          echo "Critical security issues found! Please review the security reports."
+          # Add notification logic here (Slack, email, etc.) 

@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  fastapi-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.12"
+        APP_ENV: "production"
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - LOG_LEVEL=INFO
+      - VLLM_BASE_URL=http://vllm-server:8001
+      - QDRANT_URL=http://qdrant:6333
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=agentic_rag
+      - POSTGRES_USER=rag_user
+      - POSTGRES_PASSWORD=secure_password
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - postgresql
+      - redis
+      - qdrant
+    networks:
+      - agentic_rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  vllm-server:
+    build:
+      context: .
+      dockerfile: vllm/Dockerfile.vllm
+    ports:
+      - "8001:8001"
+    environment:
+      - MODEL_NAME=llama-2-7b
+      - MAX_MODEL_LEN=4096
+      - TENSOR_PARALLEL_SIZE=1
+    volumes:
+      - ./models:/models
+      - ./cache:/cache
+    networks:
+      - agentic_rag_network
+    restart: unless-stopped
+    # GPU requirements removed for development
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgresql:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=agentic_rag
+      - POSTGRES_USER=rag_user
+      - POSTGRES_PASSWORD=secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - agentic_rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag_user -d agentic_rag"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - agentic_rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - agentic_rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - agentic_rag_network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - agentic_rag_network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  agentic_rag_network:
+    driver: bridge 

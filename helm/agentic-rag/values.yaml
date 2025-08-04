@@ -1,0 +1,184 @@
+# Default values for agentic-rag
+replicaCount: 3
+
+image:
+  repository: agentic-rag
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: api.agentic-rag.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: agentic-rag-tls
+      hosts:
+        - api.agentic-rag.com
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "250m"
+  limits:
+    memory: "1Gi"
+    cpu: "500m"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+persistence:
+  enabled: true
+  storageClass: "fast-ssd"
+  appData:
+    size: 10Gi
+  appLogs:
+    size: 5Gi
+
+config:
+  app:
+    name: agentic-rag
+    version: "1.0.0"
+    environment: production
+    debug: false
+  
+  database:
+    host: postgresql-service
+    port: 5432
+    name: agentic_rag
+    pool_size: 10
+    max_overflow: 20
+  
+  redis:
+    host: redis-service
+    port: 6379
+    db: 0
+    max_connections: 20
+  
+  vllm:
+    host: vllm-service
+    port: 8001
+    model_name: llama-2-7b
+    max_model_len: 4096
+  
+  qdrant:
+    host: qdrant-service
+    port: 6333
+    collection_name: documents
+  
+  monitoring:
+    prometheus_enabled: true
+    grafana_enabled: true
+    log_level: INFO
+  
+  security:
+    jwt_secret_key: ${JWT_SECRET}
+    bcrypt_rounds: 12
+    cors_origins: ["https://api.agentic-rag.com"]
+  
+  rate_limiting:
+    requests_per_minute: 100
+    burst_size: 20
+
+secrets:
+  postgres_user: rag_user
+  postgres_password: secure_password
+  redis_password: redis_password
+  jwt_secret: jwt_secret_key
+  api_key: api_secret_key
+
+monitoring:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  grafana:
+    enabled: true
+    dashboard:
+      enabled: true
+      title: "Agentic RAG Dashboard"
+  
+  alerting:
+    enabled: true
+    rules:
+      - alert: HighCPUUsage
+        expr: container_cpu_usage_seconds_total > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "Container {{ $labels.container }} has high CPU usage"
+
+serviceMesh:
+  istio:
+    enabled: false
+    virtualService:
+      enabled: false
+    destinationRule:
+      enabled: false
+
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention:
+    days: 30
+  storage:
+    class: fast-ssd
+    size: 100Gi 

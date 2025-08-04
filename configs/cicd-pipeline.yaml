@@ -1,0 +1,242 @@
+# CI/CD Pipeline Configuration
+# Defines deployment environments, strategies, and testing requirements
+
+pipeline:
+  name: "Agentic RAG CI/CD Pipeline"
+  version: "1.0.0"
+  description: "Complete CI/CD pipeline for Agentic RAG system"
+
+environments:
+  development:
+    branch: "develop"
+    auto_deploy: true
+    kubernetes_namespace: "agentic-rag-dev"
+    helm_chart: "agentic-rag"
+    helm_values: "values-dev.yaml"
+    deployment_strategy: "rolling"
+    replicas: 1
+    resources:
+      cpu_request: "100m"
+      cpu_limit: "200m"
+      memory_request: "256Mi"
+      memory_limit: "512Mi"
+    health_check:
+      enabled: true
+      path: "/health"
+      initial_delay: 30
+      period: 10
+      timeout: 5
+      failure_threshold: 3
+    monitoring:
+      prometheus_enabled: true
+      grafana_enabled: false
+      log_level: "DEBUG"
+
+  staging:
+    branch: "staging"
+    auto_deploy: true
+    kubernetes_namespace: "agentic-rag-staging"
+    helm_chart: "agentic-rag"
+    helm_values: "values-staging.yaml"
+    deployment_strategy: "rolling"
+    replicas: 2
+    resources:
+      cpu_request: "250m"
+      cpu_limit: "500m"
+      memory_request: "512Mi"
+      memory_limit: "1Gi"
+    health_check:
+      enabled: true
+      path: "/health"
+      initial_delay: 30
+      period: 10
+      timeout: 5
+      failure_threshold: 3
+    monitoring:
+      prometheus_enabled: true
+      grafana_enabled: true
+      log_level: "INFO"
+
+  production:
+    branch: "main"
+    auto_deploy: false
+    manual_approval: true
+    kubernetes_namespace: "agentic-rag"
+    helm_chart: "agentic-rag"
+    helm_values: "values-prod.yaml"
+    deployment_strategy: "rolling"
+    replicas: 3
+    resources:
+      cpu_request: "500m"
+      cpu_limit: "1000m"
+      memory_request: "1Gi"
+      memory_limit: "2Gi"
+    health_check:
+      enabled: true
+      path: "/health"
+      initial_delay: 30
+      period: 10
+      timeout: 5
+      failure_threshold: 3
+    monitoring:
+      prometheus_enabled: true
+      grafana_enabled: true
+      log_level: "INFO"
+    scaling:
+      hpa_enabled: true
+      min_replicas: 3
+      max_replicas: 10
+      target_cpu_utilization: 70
+
+rollback:
+  enabled: true
+  max_versions: 5
+  auto_rollback_on_failure: true
+  rollback_window: "10m"
+  health_check_after_rollback: true
+
+testing:
+  unit_tests:
+    enabled: true
+    framework: "pytest"
+    coverage_threshold: 90
+    test_pattern: "tests/unit/"
+    parallel_execution: true
+    timeout: 300
+
+  integration_tests:
+    enabled: true
+    framework: "pytest"
+    test_pattern: "tests/integration/"
+    requires_database: true
+    requires_redis: true
+    timeout: 600
+    parallel_execution: false
+
+  e2e_tests:
+    enabled: true
+    framework: "pytest"
+    test_pattern: "tests/e2e/"
+    requires_full_stack: true
+    browser_testing: false
+    timeout: 900
+    parallel_execution: false
+
+  security_scanning:
+    enabled: true
+    vulnerability_scanning: true
+    dependency_checking: true
+    container_scanning: true
+    secrets_detection: true
+    fail_on_high_severity: true
+    tools:
+      - "bandit"
+      - "safety"
+      - "trivy"
+
+  performance_testing:
+    enabled: true
+    load_testing: true
+    stress_testing: true
+    benchmark_testing: true
+    response_time_threshold: 2000
+    throughput_threshold: 100
+    tools:
+      - "locust"
+      - "artillery"
+
+quality_gates:
+  test_coverage:
+    minimum: 90
+    fail_on_decrease: true
+
+  security_scan:
+    max_high_severity: 0
+    max_medium_severity: 5
+    fail_on_new_vulnerabilities: true
+
+  performance:
+    max_response_time_p95: 2000
+    min_throughput: 100
+    max_error_rate: 0.01
+
+  code_quality:
+    linting_enabled: true
+    type_checking_enabled: true
+    formatting_enabled: true
+    tools:
+      - "ruff"
+      - "black"
+      - "mypy"
+
+notifications:
+  slack:
+    enabled: true
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channels:
+      - "deployments"
+      - "alerts"
+    events:
+      - "deployment_started"
+      - "deployment_success"
+      - "deployment_failure"
+      - "rollback_triggered"
+
+  email:
+    enabled: false
+    recipients: []
+    events: []
+
+  teams:
+    enabled: false
+    webhook_url: ""
+    events: []
+
+artifacts:
+  docker_images:
+    registry: "ghcr.io"
+    repository: "agentic-rag"
+    tag_strategy: "git-sha"
+    cache_enabled: true
+
+  helm_charts:
+    repository: "helm-repo"
+    version_strategy: "semver"
+    sign_enabled: false
+
+  test_reports:
+    junit: true
+    coverage: true
+    performance: true
+    security: true
+
+monitoring:
+  prometheus:
+    enabled: true
+    scrape_interval: "15s"
+    retention_days: 30
+
+  grafana:
+    enabled: true
+    dashboards:
+      - "deployment-overview"
+      - "application-metrics"
+      - "infrastructure-metrics"
+
+  alerting:
+    enabled: true
+    rules:
+      - "deployment-failure"
+      - "high-error-rate"
+      - "high-latency"
+      - "resource-usage"
+
+backup:
+  enabled: true
+  strategy: "automated"
+  retention_days: 30
+  schedule: "0 2 * * *"
+  components:
+    - "database"
+    - "configurations"
+    - "logs" 

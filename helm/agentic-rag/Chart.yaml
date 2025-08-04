@@ -1,0 +1,17 @@
+apiVersion: v2
+name: agentic-rag
+description: Agentic RAG System with Local LLMs
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - rag
+  - llm
+  - ai
+  - agentic
+home: https://github.com/agentic-rag/agentic-rag
+sources:
+  - https://github.com/agentic-rag/agentic-rag
+maintainers:
+  - name: Agentic RAG Team
+    email: team@agentic-rag.com 
