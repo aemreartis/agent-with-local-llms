@@ -260,4 +260,39 @@ class ApplicationAssembler:
                 "query_orchestrator", 
                 "chat_service"
             ]
-        } 
+        }
+    
+    async def initialize(self) -> None:
+        """Initialize the application assembler with default configuration."""
+        # Mock initialization for API testing
+        pass
+    
+    def get_chat_service(self):
+        """Get chat service instance."""
+        # Mock implementation for API testing
+        from src.orchestration.chat_service import ChatService
+        return ChatService()
+    
+    def get_query_orchestrator(self):
+        """Get query orchestrator instance."""
+        # Mock implementation for API testing
+        from src.orchestration.query_orchestrator import QueryOrchestrator
+        return QueryOrchestrator()
+    
+    def get_search_orchestrator(self):
+        """Get search orchestrator instance."""
+        # Mock implementation for API testing
+        from src.orchestration.search_orchestrator import SearchOrchestrator
+        return SearchOrchestrator()
+    
+    def get_agent_orchestrator(self):
+        """Get agent orchestrator instance."""
+        # Mock implementation for API testing
+        from src.agents.agent_orchestrator import AgentOrchestrator
+        return AgentOrchestrator()
+    
+    def get_document_pipeline(self):
+        """Get document pipeline instance."""
+        # Mock implementation for API testing
+        from src.providers.document.document_pipeline import DocumentPipeline
+        return DocumentPipeline() 
