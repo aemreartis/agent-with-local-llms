@@ -1,6 +1,6 @@
 """Agent Orchestrator.
 
-High-level agent coordination and session management.
+High-level agent coordination and session management with LangGraph integration.
 """
 
 import asyncio
@@ -17,11 +17,19 @@ from src.interfaces.agent_interface import (
     WorkflowStep,
     AgentNodeInterface
 )
-from src.agents.agent_workflow_orchestrator import AgentWorkflowOrchestrator
+from src.agents.agent_workflow_orchestrator import LangGraphWorkflowOrchestrator
+from src.agents.langchain_workflows import (
+    LangGraphToolUsageWorkflow, 
+    LangGraphRAGWorkflow, 
+    LangGraphConversationWorkflow,
+    create_default_langgraph_state
+)
+from src.agents.langchain_nodes import create_langchain_tools_from_registry
+from src.agents.tool_registry import ToolRegistry
 
 
 class AgentOrchestrator(AgentOrchestratorInterface):
-    """High-level agent orchestrator for session management and workflow coordination."""
+    """High-level agent orchestrator with LangGraph integration."""
     
     def __init__(self):
         """Initialize the agent orchestrator."""
@@ -30,30 +38,51 @@ class AgentOrchestrator(AgentOrchestratorInterface):
         self._sessions: Dict[str, AgentState] = {}
         self._max_sessions: int = 5
         self._session_timeout: float = 1800.0  # 30 minutes
-        self._default_workflow: str = "default_workflow"
+        self._default_workflow: str = "tool_usage_workflow"
         self._enable_parallel_execution: bool = False
         self._session_cleanup_interval: float = 300.0  # 5 minutes
-        self._workflow_orchestrator: Optional[AgentWorkflowOrchestrator] = None
+        self._workflow_orchestrator: Optional[LangGraphWorkflowOrchestrator] = None
         self._cleanup_task: Optional[asyncio.Task] = None
+        
+        # LangGraph workflows
+        self._langgraph_workflows: Dict[str, Any] = {}
+        self._tool_registry: Optional[ToolRegistry] = None
     
     async def initialize(self, config: Dict[str, Any]) -> None:
         """Initialize the agent orchestrator with configuration."""
         self._config = config.copy()
         self._max_sessions = config.get("max_sessions", 5)
         self._session_timeout = config.get("session_timeout", 1800.0)
-        self._default_workflow = config.get("default_workflow", "default_workflow")
+        self._default_workflow = config.get("default_workflow", "tool_usage_workflow")
         self._enable_parallel_execution = config.get("enable_parallel_execution", False)
         self._session_cleanup_interval = config.get("session_cleanup_interval", 300.0)
         
-        # Initialize workflow orchestrator
-        self._workflow_orchestrator = AgentWorkflowOrchestrator()
+        # Initialize workflow orchestrator (for backward compatibility)
+        self._workflow_orchestrator = LangGraphWorkflowOrchestrator()
         workflow_config = config.get("workflow_orchestrator", {})
         await self._workflow_orchestrator.initialize(workflow_config)
+        
+        # Initialize tool registry
+        self._tool_registry = ToolRegistry()
+        tool_config = config.get("tool_registry", {})
+        await self._tool_registry.initialize(tool_config)
+        
+        # Initialize LangGraph workflows
+        await self._initialize_langgraph_workflows()
         
         # Start cleanup task
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         
         self._initialized = True
+    
+    async def _initialize_langgraph_workflows(self) -> None:
+        """Initialize LangGraph workflows."""
+        # Create default workflows
+        self._langgraph_workflows["rag_workflow"] = LangGraphRAGWorkflow()
+        self._langgraph_workflows["conversation_workflow"] = LangGraphConversationWorkflow()
+        
+        # Tool usage workflow will be created dynamically based on available tools
+        # since it requires the tool registry to be populated
     
     async def create_session(self, context: AgentContext) -> str:
         """Create a new agent session."""
@@ -84,7 +113,7 @@ class AgentOrchestrator(AgentOrchestratorInterface):
         return context.session_id
     
     async def execute_workflow(self, session_id: str, workflow_name: str, initial_data: Dict[str, Any]) -> AgentState:
-        """Execute a workflow for a session."""
+        """Execute a workflow for a session using LangGraph."""
         if not self._initialized:
             raise RuntimeError("Agent orchestrator not initialized")
         
@@ -109,8 +138,8 @@ class AgentOrchestrator(AgentOrchestratorInterface):
         session_state.updated_at = datetime.now()
         
         try:
-            # Execute workflow
-            result = await self._workflow_orchestrator.execute_workflow(workflow_name, session_state)
+            # Execute LangGraph workflow
+            result = await self._execute_langgraph_workflow(workflow_name, session_state)
             
             # Update session with result
             self._sessions[session_id] = result
@@ -120,6 +149,70 @@ class AgentOrchestrator(AgentOrchestratorInterface):
             # Handle workflow execution errors
             session_state.state = AgentExecutionState.FAILED
             session_state.error = str(e)
+            session_state.updated_at = datetime.now()
+            return session_state
+    
+    async def _execute_langgraph_workflow(self, workflow_name: str, session_state: AgentState) -> AgentState:
+        """Execute a LangGraph workflow."""
+        query = session_state.data.get("query", "")
+        
+        if workflow_name == "tool_usage_workflow":
+            # Create tool usage workflow with current tools
+            if self._tool_registry:
+                langchain_tools = await create_langchain_tools_from_registry(
+                    self._tool_registry, session_state.context
+                )
+                workflow = LangGraphToolUsageWorkflow(tools=langchain_tools)
+            else:
+                # Fallback to empty tool list
+                workflow = LangGraphToolUsageWorkflow(tools=[])
+        
+        elif workflow_name == "rag_workflow":
+            workflow = self._langgraph_workflows.get("rag_workflow")
+            if not workflow:
+                raise ValueError(f"RAG workflow not initialized")
+        
+        elif workflow_name == "conversation_workflow":
+            workflow = self._langgraph_workflows.get("conversation_workflow")
+            if not workflow:
+                raise ValueError(f"Conversation workflow not initialized")
+        
+        else:
+            # Try to execute via the legacy workflow orchestrator
+            return await self._workflow_orchestrator.execute_workflow(workflow_name, session_state)
+        
+        # Compile and execute LangGraph workflow
+        compiled_workflow = workflow.compile()
+        
+        # Create LangGraph state
+        langgraph_state = create_default_langgraph_state(query, session_state.context)
+        langgraph_state["agent_state"] = session_state
+        
+        # Execute workflow
+        result_state = await compiled_workflow.ainvoke(langgraph_state)
+        
+        # Extract AgentState from LangGraph result
+        if "agent_state" in result_state:
+            final_state = result_state["agent_state"]
+            # Update with LangGraph execution data
+            final_state.data.update({
+                "langgraph_execution": True,
+                "tools_used": result_state.get("tools_used", []),
+                "reasoning_steps": result_state.get("reasoning_steps", []),
+                "final_answer": result_state.get("final_answer"),
+                "messages": [msg.content for msg in result_state.get("messages", [])]
+            })
+            final_state.state = AgentExecutionState.COMPLETED
+            final_state.updated_at = datetime.now()
+            return final_state
+        else:
+            # Fallback: create new state from result
+            session_state.data.update({
+                "langgraph_result": result_state,
+                "final_answer": result_state.get("final_answer"),
+                "tools_used": result_state.get("tools_used", [])
+            })
+            session_state.state = AgentExecutionState.COMPLETED
             session_state.updated_at = datetime.now()
             return session_state
     
@@ -201,6 +294,15 @@ class AgentOrchestrator(AgentOrchestratorInterface):
             except Exception:
                 return False
         
+        # Check tool registry health
+        if self._tool_registry:
+            try:
+                tool_health = await self._tool_registry.health_check()
+                if not tool_health:
+                    return False
+            except Exception:
+                return False
+        
         return True
     
     def get_orchestrator_info(self) -> Dict[str, Any]:
@@ -214,7 +316,10 @@ class AgentOrchestrator(AgentOrchestratorInterface):
             "default_workflow": self._default_workflow,
             "enable_parallel_execution": self._enable_parallel_execution,
             "session_cleanup_interval": self._session_cleanup_interval,
-            "sessions": list(self._sessions.keys())
+            "sessions": list(self._sessions.keys()),
+            "langgraph_integration": True,
+            "available_workflows": list(self._langgraph_workflows.keys()) + ["tool_usage_workflow"],
+            "tool_registry_initialized": self._tool_registry is not None
         }
     
     def list_sessions(self) -> List[str]:
@@ -239,8 +344,23 @@ class AgentOrchestrator(AgentOrchestratorInterface):
             "created_at": session_state.created_at.isoformat(),
             "updated_at": session_state.updated_at.isoformat(),
             "error": session_state.error,
-            "metadata": session_state.context.metadata
+            "metadata": session_state.context.metadata,
+            "langgraph_execution": session_state.data.get("langgraph_execution", False),
+            "tools_used": session_state.data.get("tools_used", []),
+            "final_answer": session_state.data.get("final_answer")
         }
+    
+    async def register_tool(self, tool_name: str, tool_instance) -> bool:
+        """Register a tool in the tool registry."""
+        if not self._tool_registry:
+            return False
+        return await self._tool_registry.register_tool(tool_name, tool_instance)
+    
+    async def get_available_tools(self) -> List[str]:
+        """Get list of available tools."""
+        if not self._tool_registry:
+            return []
+        return await self._tool_registry.list_tools()
     
     async def _cleanup_loop(self) -> None:
         """Background task for cleaning up expired sessions."""

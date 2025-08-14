@@ -6,7 +6,8 @@ import os
 import signal
 import subprocess
 import sys
-from typing import Any, Dict, List
+import argparse
+from typing import Any, Dict, List, Tuple
 
 # Ensure project root is on sys.path for 'src.*' imports when running as a script
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
@@ -27,6 +28,17 @@ MOCK_API_CMD = [
     "python",
     os.path.join(os.path.dirname(__file__), "mock_quantity_api.py"),
 ]
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Items query example with auto routing")
+    parser.add_argument(
+        "-q",
+        "--query",
+        type=str,
+        help="User query, e.g. 'give me my items that price is over 500k' or 'give me quantity of items over 100'",
+    )
+    return parser.parse_args()
 
 
 async def setup_db() -> None:
@@ -68,11 +80,25 @@ async def start_mock_api():
             proc.terminate()
 
 
+def decide_tool(query: str) -> Tuple[str, str]:
+    ql = (query or "").lower()
+    if "quantity" in ql:
+        return "items_quantity", "Detected 'quantity' → using API tool"
+    if "price" in ql:
+        return "items_price", "Detected 'price' → using DB tool"
+    # Fallback heuristics: numbers with 'over' or '>' often imply thresholds; prefer price tool
+    if ">" in ql or "over" in ql:
+        return "items_price", "Heuristic threshold detected → defaulting to DB tool"
+    return "items_quantity", "No explicit signal → defaulting to API tool"
+
+
 async def main() -> None:
+    args = parse_args()
+    user_query = args.query or input("Enter your query: ").strip()
+
     await setup_db()
 
     async with start_mock_api():
-        # Build tool registry and register both tools
         registry = ToolRegistry()
         await registry.initialize({})
 
@@ -84,21 +110,15 @@ async def main() -> None:
         await quantity_tool.initialize({"base_url": "http://127.0.0.1:8099"})
         await registry.register_tool("items_quantity", quantity_tool)
 
-        # Build a simple agent context
         ctx = AgentContext(session_id="demo-session", user_id="demo-user")
 
-        # Query 1: price over 500k (DB)
-        q1 = "give me my items that price is over 500k"
-        res1 = await registry.execute_tool("items_price", {"query": q1}, ctx)
+        tool_name, reason = decide_tool(user_query)
+        result = await registry.execute_tool(tool_name, {"query": user_query}, ctx)
 
-        # Query 2: quantity over 100 (API)
-        q2 = "give me quantity of items over 100"
-        res2 = await registry.execute_tool("items_quantity", {"query": q2}, ctx)
-
-        print("\n=== Price query result (DB) ===")
-        print(res1.data)
-        print("\n=== Quantity query result (API) ===")
-        print(res2.data)
+        print("\n=== Router ===")
+        print({"chosen_tool": tool_name, "reason": reason})
+        print("\n=== Result ===")
+        print(result.data if result.success else {"error": result.error})
 
 
 if __name__ == "__main__":
