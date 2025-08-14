@@ -18,9 +18,8 @@ class RedisMemoryProvider(MemoryInterface):
         """Initialize the Redis provider with configuration."""
         try:
             import redis
-            from redis import asyncio as redis_async
             
-            self.redis_client = redis_async.Redis(
+            self.redis_client = redis.asyncio.Redis(
                 host=config.get("host", "localhost"),
                 port=config.get("port", 6379),
                 db=config.get("db", 0),

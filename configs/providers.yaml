@@ -27,7 +27,7 @@ memory:
         table_name: "conversation_memory"
         max_connections: 10
     hybrid:
-      class: "providers.memory.hybrid_provider.HybridMemoryProvider"
+      class: "src.providers.memory.hybrid_provider.HybridMemoryProvider"
       config:
         redis_ttl: 3600  # 1 hour in Redis
         migration_enabled: true

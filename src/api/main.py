@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Request, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.websockets import WebSocket, WebSocketDisconnect
 import json
 import logging
@@ -47,6 +47,13 @@ from src.orchestration.query_orchestrator import QueryOrchestrator
 from src.orchestration.search_orchestrator import SearchOrchestrator
 from src.agents.agent_orchestrator import AgentOrchestrator
 from src.providers.document.document_pipeline import DocumentPipeline
+
+# Import RAG endpoints and orchestrator
+from src.api import rag_endpoints
+from src.orchestration.rag_pipeline import RAGPipelineOrchestrator
+from src.interfaces.reranker_interface import RerankerInterface
+from src.interfaces.llm_interface import LLMInterface
+from src.providers.memory.inmemory_provider import InMemoryProvider
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -85,6 +92,44 @@ async def lifespan(app: FastAPI):
     search_orchestrator = app_assembler.get_search_orchestrator()
     agent_orchestrator = app_assembler.get_agent_orchestrator()
     document_pipeline = app_assembler.get_document_pipeline()
+
+    # Initialize a default RAG pipeline for API usage
+    try:
+        class _NoOpReranker(RerankerInterface):
+            async def initialize(self, config: Dict[str, Any]) -> None:
+                return None
+            async def rerank(self, query: str, documents: List[Dict[str, Any]], top_k: Optional[int] = None) -> List[Dict[str, Any]]:
+                return documents[: top_k or len(documents)]
+            async def health_check(self) -> Dict[str, Any] | bool:
+                return {"status": "healthy"}
+        
+        class _SimpleLLM(LLMInterface):
+            async def initialize(self, config: Dict[str, Any]) -> None:
+                return None
+            async def generate(self, prompt: str, **kwargs) -> str:
+                return "This is a default response. Configure a real LLM provider for production."
+            async def embed(self, text: str) -> List[float]:
+                return [0.0] * 10
+            async def health_check(self) -> bool:
+                return True
+        
+        memory = InMemoryProvider()
+        await memory.initialize({})
+        reranker = _NoOpReranker()
+        await reranker.initialize({})
+        llm = _SimpleLLM()
+        await llm.initialize({})
+        
+        rag_endpoints.rag_pipeline = RAGPipelineOrchestrator(
+            search_orchestrator=search_orchestrator,
+            reranker=reranker,
+            llm_provider=llm,
+            memory_provider=memory,
+            config={}
+        )
+        logger.info("RAG pipeline initialized for API endpoints")
+    except Exception as e:
+        logger.warning(f"Failed to initialize RAG pipeline: {e}")
     
     logger.info("API application started successfully")
     
@@ -680,16 +725,16 @@ def create_app(assembler: Optional[ApplicationAssembler] = None) -> FastAPI:
         metrics = f"""
 # HELP http_requests_total Total number of HTTP requests
 # TYPE http_requests_total counter
-http_requests_total{{method="GET",endpoint="/health"}} 10
+http_requests_total{{method=\"GET\",endpoint=\"/health\"}} 10
 
 # HELP http_request_duration_seconds HTTP request duration in seconds
 # TYPE http_request_duration_seconds histogram
-http_request_duration_seconds_bucket{{method="GET",endpoint="/health",le="0.1"}} 8
-http_request_duration_seconds_bucket{{method="GET",endpoint="/health",le="0.5"}} 10
-http_request_duration_seconds_bucket{{method="GET",endpoint="/health",le="+Inf"}} 10
-http_request_duration_seconds_sum{{method="GET",endpoint="/health"}} 0.5
-http_request_duration_seconds_count{{method="GET",endpoint="/health"}} 10
+http_request_duration_seconds_bucket{{method=\"GET\",endpoint=\"/health\",le=\"0.1\"}} 8
+http_request_duration_seconds_bucket{{method=\"GET\",endpoint=\"/health\",le=\"0.5\"}} 10
+http_request_duration_seconds_bucket{{method=\"GET\",endpoint=\"/health\",le=\"+Inf\"}} 10
+http_request_duration_seconds_sum{{method=\"GET\",endpoint=\"/health\"}} 0.5
+http_request_duration_seconds_count{{method=\"GET\",endpoint=\"/health\"}} 10
 """
-        return metrics
+        return PlainTextResponse(content=metrics, media_type="text/plain; version=0.0.4")
     
     return app 

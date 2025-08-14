@@ -15,7 +15,7 @@ from src.orchestration.rag_pipeline import RAGPipelineOrchestrator
 # Import providers (you'll need to initialize these with your config)
 from src.providers.llm.vllm_provider import VLLMProvider
 from src.providers.memory.redis_provider import RedisMemoryProvider
-from src.providers.rerankers.bge_provider import BGERerankerProvider
+from src.providers.rerankers.bge_provider import BGEProvider
 from src.orchestration.search_orchestrator import SearchOrchestrator
 
 
@@ -56,7 +56,7 @@ async def setup_rag_pipeline():
         })
         
         # Reranker Provider
-        reranker = BGERerankerProvider()
+        reranker = BGEProvider()
         await reranker.initialize({
             "model_name": "BAAI/bge-reranker-base",
             "device": "cpu"

@@ -6,7 +6,7 @@ Following TDD methodology: Auth logic defined first, then integration.
 """
 
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -49,9 +49,9 @@ class AuthService:
         """Create a JWT access token"""
         to_encode = data.copy()
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(UTC) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
+            expire = datetime.now(UTC) + timedelta(minutes=self.access_token_expire_minutes)
         
         to_encode.update({"exp": expire, "type": "access"})
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
@@ -60,7 +60,7 @@ class AuthService:
     def create_refresh_token(self, data: Dict[str, Any]) -> str:
         """Create a JWT refresh token"""
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
+        expire = datetime.now(UTC) + timedelta(days=self.refresh_token_expire_days)
         to_encode.update({"exp": expire, "type": "refresh"})
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
         return encoded_jwt
@@ -249,7 +249,7 @@ class MockAuthService:
     def create_access_token(self, data: Dict[str, Any]) -> str:
         """Create a mock access token"""
         to_encode = data.copy()
-        to_encode.update({"exp": datetime.utcnow() + timedelta(hours=1), "type": "access"})
+        to_encode.update({"exp": datetime.now(UTC) + timedelta(hours=1), "type": "access"})
         return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
     
     def verify_token(self, token: str) -> Dict[str, Any]:
@@ -273,7 +273,7 @@ class RateLimiter:
     
     def is_allowed(self, key: str, max_requests: int = 100, window_seconds: int = 60) -> bool:
         """Check if request is allowed based on rate limit"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         window_start = now - timedelta(seconds=window_seconds)
         
         if key not in self.requests:
